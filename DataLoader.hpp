@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 #include <vector>
 #include <string>
 #include <fstream>
@@ -15,25 +16,72 @@ namespace DataLoader
 		Matrix
 	};
 
+	namespace Flags
+	{
+		// No Flags
+		const unsigned NullOpts = 0;
+
+		namespace Vector
+		{
+			namespace Parse
+			{
+				// Read vector's size first (automatically check for items count)
+				const unsigned Size = 1;
+
+				// Read vector's elements line by line
+				const unsigned ItemsLineByLine = (1 << 1);
+
+				// Read vector's elements at one as a delimeter-separated string
+				const unsigned ItemsAtOnce = (1 << 2);
+			}
+
+			namespace Check
+			{
+				// All loaded vectors should have the same length
+				const unsigned LengthEquality = (1 << 3);
+			}
+		}
+
+		namespace Matrix
+		{
+			namespace Parse
+			{
+				// Read dimentions: each value on separate line {val_1 \n val_2}
+				const unsigned DimentionsLineByLine = 1;
+
+				// Read dimentions: each value on the same line {val_1 <delim> val_2 }
+				const unsigned DimentionsAtOnce = (1 << 1);
+			}
+
+			namespace Check {}
+		}
+	}
+
+	// Namespace Aliases
+	namespace Flags_Vector_Parse = Flags::Vector::Parse;
+	namespace Flags_Vector_Check = Flags::Vector::Check;
+	namespace Flags_Matrix_Parse = Flags::Matrix::Parse;
+	namespace Flags_Matrix_Check = Flags::Matrix::Check;
+
 	namespace Flags 
 	{
 		// [ReadVector]
 
 		/* Assume that size for vector is not provided */
-		const unsigned VectorNoSize = 1;
-		/* Read size of vector and validate if the number of given items corresponds to */
-		const unsigned CheckVectorLength = (1 << 1);
+		//const unsigned VectorNoSize = 1;
+		/* Read size of vector and validate if the number of given items corresponds */
+		//const unsigned VectorReadSize = (1 << 1);
 		/* Check if all vectors have the same length */
-		const unsigned CheckVectorsLenEquality = (1 << 2);
+		//const unsigned CheckVectorsLenEquality = (1 << 2);
 
 		// [ReadMatrix]
 
 		/* Read dimensions (row, col) */
-		const unsigned ReadDimentions = (1 << 3);
+		//const unsigned ReadDimentions = (1 << 3);
 		/* Read dimentions: each value on separate line {val_1 \n val_2} */
-		const unsigned ReadDimLineByLine = (1 << 4);
+		//const unsigned ReadDimLineByLine = (1 << 4);
 		/* Read dimentions: each value on the same line {val_1 <delim> val_2 } */
-		const unsigned ReadDimOneLine = (1 << 5);
+		//const unsigned ReadDimOneLine = (1 << 5);
 
 		// [ReadArbitrary]
 
@@ -51,6 +99,7 @@ namespace DataLoader
 		const unsigned FileReadFailure = (1 << 3); // ios::bad
 		const unsigned VectorItemsWrongNumber = (1 << 4); // fail
 		const unsigned VectorsHaveDifferentLength = (1 << 4); // fail
+		const unsigned WrongReadConfiguration = (1 << 5); // fail
 	}
 
 	// Restricting the usage of Loader class
@@ -79,17 +128,36 @@ namespace DataLoader
 		// Storage for read data
 		std::vector<std::vector<U>> _storageVector;
 
-		void split(std::string line, std::vector<U>& storage)
+		void split(std::fstream& stream, std::vector<U>& storage, size_t lines_to_read)
 		{
-			std::stringstream sstream(line);
+			std::string line;
+			std::stringstream sstream;
 			std::stringstream sconvert;
 			std::string item;
 			U num;
-			while (std::getline(sstream, item, _delimeter)) {
-				sconvert.str(item);
-				sconvert >> num;
-				sconvert.clear();
-				storage.push_back(num);
+
+			while (!stream.eof() && lines_to_read--)
+			{
+				// Read vector's items
+				std::getline(stream, line);
+
+				if (!stream.eof() && stream.rdstate() != std::ios::goodbit)
+				{
+					if (stream.fail()) _state = State::FileReadFormatError;
+					if (stream.bad()) _state = State::FileReadFailure;
+					break;
+				}
+				
+				sstream.str(line);
+				
+				while (std::getline(sstream, item, _delimeter)) {
+					sconvert.str(item);
+					sconvert >> num;
+					sconvert.clear();
+					storage.push_back(num);
+				}
+
+				sstream.clear();
 			}
 		}
 
@@ -159,7 +227,8 @@ namespace DataLoader
 		{}
 
 		// Parse input file for vector-based data
-		void read_vector(unsigned opts = Flags::VectorNoSize, Kind type = Kind::Vector)
+		void read_vector(unsigned check_opts = Flags::NullOpts, 
+			unsigned parse_opts = Flags_Vector_Parse::ItemsAtOnce, Kind type = Kind::Vector)
 		{
 			size_t lenNextVector{ 0 }, lenAllVectors{ 0 };
 			std::string line, line1, line2;
@@ -176,42 +245,55 @@ namespace DataLoader
 
 			_storageVector.clear();
 
-			// Flags
-			auto checkVecLength = opts & Flags::CheckVectorLength;
-			auto checkVecEquality = opts & Flags::CheckVectorsLenEquality;
+			// Validate vector length if appropriate option is given
+			bool checkVecLength = parse_opts & Flags_Vector_Parse::Size;
+			// For each vector given check if items number remains the same
+			bool checkVecEquality = check_opts & Flags_Vector_Check::LengthEquality;
+			// If no Size is given and parse option is set to ItemsLineByLine,
+			// we are to read in one vector storage until the end of the file
+			bool readUntilEOF = !checkVecLength && (parse_opts & Flags_Vector_Parse::ItemsLineByLine);
+
 			while (std::getline(fstream, line))
 			{
-				std::vector<U> item;
+				std::vector<U> storageItem;
 
 				// Read vector's length
 				if (checkVecLength)
 				{
 					sstream.str(line);
 					sstream >> lenNextVector;
-					sstream.clear();
+					sstream.clear();					
 
-					// Read vector's items
-					std::getline(fstream, line);
-
-					if (fstream.rdstate() != std::ios::goodbit)
-					{
-						if (fstream.fail()) _state = State::FileReadFormatError;
-						if (fstream.bad()) _state = State::FileReadFailure;
-						break;
-					}
-
-					item.reserve(lenNextVector);
+					storageItem.reserve(lenNextVector);
 				}
 				
-				// Parse vector's elements
-				split(line, item);
+				size_t line_to_read = { 0 };
+				// How many lines we need to read for a vector to be filled?
+				//  -- if "ReadUntilEOF" flag is set, read until the EOF (lines to read = MAX(size_t))
+				//  -- if "ItemsAtOnce" flag is set, read one line no matter if we are given size or not
+				//  -- last case: flag "ItemsLineByLine" is set and "Size" flag is given, read "LenNextVector" lines
+				line_to_read =
+					readUntilEOF ? std::numeric_limits<std::size_t>::max() :
+					parse_opts & Flags_Vector_Parse::ItemsAtOnce ? 1 :
+					checkVecLength && (parse_opts & Flags_Vector_Parse::ItemsLineByLine) ? lenNextVector : 0;
+
+				// Above were considered all the possible cases, so this condition will never
+				// be executed, unless new conditions appear
+				if (line_to_read == 0)
+				{
+					_state = State::WrongReadConfiguration;
+					break;
+				}
+
+				// Load vector's elements
+				split(fstream, storageItem, line_to_read);
 
 				// Check if vectors are equal
 				if (checkVecEquality)
 				{
 					if (lenAllVectors == 0)
-						lenAllVectors = item.size();
-					else if (lenAllVectors != item.size())
+						lenAllVectors = storageItem.size();
+					else if (lenAllVectors != storageItem.size())
 					{
 						_state = State::VectorsHaveDifferentLength;
 						break;
@@ -219,50 +301,54 @@ namespace DataLoader
 				}
 
 				// Check if given length for vector items is valid
-				if (checkVecLength && lenNextVector != item.size())
+				if (checkVecLength && lenNextVector != storageItem.size())
 				{
 					_state = State::VectorItemsWrongNumber;
 					break;
 				}
-				_storageVector.push_back(item);
+
+				// Add vector to the storage
+				_storageVector.push_back(storageItem);
 			}
+
 			fstream.close();
 		}
 
 		// Parse input file for matrix-based data
-		void ReadMatrix(unsigned opts = (Flags::ReadDimentions | Flags::ReadDimOneLine), Kind type = Kind::Matrix)
+		void ReadMatrix(unsigned check_opts = Flags::NullOpts, 
+			unsigned parse_opts = Flags_Matrix_Parse::DimentionsAtOnce, Kind type = Kind::Matrix)
 		{
-			std::string line, line1, line2;
-			std::fstream fstream;
-			std::stringstream sstream;
+			//std::string line, line1, line2;
+			//std::fstream fstream;
+			//std::stringstream sstream;
 
-			fstream.open(_file, std::ios_base::in);
+			//fstream.open(_file, std::ios_base::in);
 
-			// Flags::ReadDimentions
-			if (opts & (Flags::ReadDimentions | Flags::ReadDimLineByLine))
-			{
-				std::getline(fstream, line1);
-				std::getline(fstream, line2);
+			//// Flags::ReadDimentions
+			//if (opts & (Flags::ReadDimentions | Flags::ReadDimLineByLine))
+			//{
+			//	std::getline(fstream, line1);
+			//	std::getline(fstream, line2);
 
-				// Row
-				sstream.str(line1);
-				sstream >> sizeRow;
-				sstream.clear();
+			//	// Row
+			//	sstream.str(line1);
+			//	sstream >> sizeRow;
+			//	sstream.clear();
 
-				// Col
-				sstream.str(line2);
-				sstream >> sizeCol;
-				sstream.clear();
-			}
+			//	// Col
+			//	sstream.str(line2);
+			//	sstream >> sizeCol;
+			//	sstream.clear();
+			//}
 
-			// Flags::ReadDimentions
-			if (opts & (Flags::ReadDimentions | Flags::ReadDimOneLine))
-			{
-				std::getline(fstream, line);
-				sstream.str(line);
-				sstream >> sizeRow >> sizeCol;
-				sstream.clear();
-			}
+			//// Flags::ReadDimentions
+			//if (opts & (Flags::ReadDimentions | Flags::ReadDimOneLine))
+			//{
+			//	std::getline(fstream, line);
+			//	sstream.str(line);
+			//	sstream >> sizeRow >> sizeCol;
+			//	sstream.clear();
+			//}
 		}
 	};
 }

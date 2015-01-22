@@ -5,15 +5,16 @@ using namespace DataLoader;
 
 int main(int argc, char** argv) 
 {
-	Loader<int> dr("input.txt");
+	Loader<float> dr("./InputData/vector_newline_based.raw");
 
-	dr.read_vector(Flags::VectorNoSize);
+	//dr.read_vector(Flags::NullOpts, Flags_Vector_Parse::Size | Flags_Vector_Parse::ItemsLineByLine);
+	dr.read_vector(Flags::NullOpts, Flags_Vector_Parse::ItemsLineByLine);
 
-	std::vector<int> newVec;
+	std::vector<float> newVec;
 	dr.arg_vector(0, newVec);
 
-	int * storage;
-	storage = (int *)malloc(10 * sizeof(int));
+	float * storage;
+	storage = (float *)malloc(10 * sizeof(float));
 	dr.arg_vector(0, storage);
 
 	auto vecRes = dr.arg_vector(0);
