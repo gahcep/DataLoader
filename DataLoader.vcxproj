@@ -71,6 +71,8 @@
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="InputData\matrix_a.raw" />
+    <None Include="InputData\matrix_b.raw" />
     <None Include="InputData\vector_delimeter_based.raw" />
     <None Include="InputData\vector_newline_based.raw" />
   </ItemGroup>
