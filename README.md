@@ -22,7 +22,7 @@ What kind of format the library supports now?
 	> `// Parse data`  
 	> `Loader<float> loader("input_file.txt");`  
 	> `loader.read_vector(Flags::NullOpts, Flags_Vector_Parse::ItemsLineByLine);`  
-	>  
+	>    
 	> `// Get vector`  
 	> `std::vector<float> vect;`  
 	> `loader.arg_vector(0, vect);`  
@@ -36,13 +36,13 @@ What kind of format the library supports now?
     API:  
 
 	> `// Parse data`  
-	> `Loader<float> loader("input_file.txt");` 
-	> `loader.delimeter(';');`
-    > `loader.read_vector(Flags::NullOpts, Flags_Vector_Parse::Size | Flags_Vector_Parse::ItemsAtOnce);`
-    > 
+	> `Loader<float> loader("input_file.txt");`  
+	> `loader.delimeter(';');`  
+    > `loader.read_vector(Flags::NullOpts, Flags_Vector_Parse::Size | Flags_Vector_Parse::ItemsAtOnce);`  
+    >   
 	> `// Get vector`  
 	> `std::vector<float> vect;`  
-	> `loader.arg_vector(0, vect);`
+	> `loader.arg_vector(0, vect);`  
 
 
 **Load matrix:**
@@ -65,14 +65,15 @@ Note: Only 2D matrices supported
 	> `Loader<float> loader("input_file.txt");`  
 	> `loader.delimeter(' ');`  
 	> `loader.read_matrix(Flags_Matrix_Parse::DimentionsAtOnce);`  
-	>  
+	>    
 	> `// Get flattened matrix`  
-	> `auto matrix = loader.arg_matrix();`
+	> `auto matrix = loader.arg_matrix();`  
 
  2. Dimentions: each value on separate line:
 
     Data:  
-    > 4 4  
+    > 4  
+    > 4  
 	> 1.7 2.1 2.6 1.2  
 	> 0.8 3.6 1.6 0.3  
 	> 2.6 1.8 1.4 1.6  
@@ -82,8 +83,7 @@ Note: Only 2D matrices supported
 
 	> `// Parse data`  
 	> `Loader<float> loader("input_file.txt");`  
-	> `loader.delimeter(' ');`  
-	> `loader.read_matrix(Flags_Matrix_Parse::DimentionsAtOnce);`  
+	> `loader.read_matrix(Flags_Matrix_Parse::DimentionsLineByLine);`  
 	>  
 	> `// Get flattened matrix`  
 	> `auto matrix = loader.arg_matrix();`    
