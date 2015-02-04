@@ -21,6 +21,24 @@ namespace DataLoader
 		// No Flags
 		const unsigned NullOpts = 0;
 
+		namespace Arbitrary
+		{
+			/*
+			-- Work with arbitrary values/numbers
+			*/
+
+			namespace Parse
+			{
+				// If met delimeter separated values, read one by one
+				const unsigned Separately = 1;
+
+				// If met delimeter separated values, read as vector
+				const unsigned Continuously = (1 << 1);
+			}
+
+			namespace Check {}
+		}
+
 		namespace Vector
 		{
 			namespace Parse
@@ -55,7 +73,7 @@ namespace DataLoader
 				// Read dimentions: each value on separate line {val_1 \n val_2}
 				const unsigned DimentionsLineByLine = 1;
 
-				// Read dimentions: each value on the same line {val_1 <delim> val_2 }
+				// Read dimentions: both values on the same line {val_1 <delim> val_2 }
 				const unsigned DimentionsAtOnce = (1 << 1);
 			}
 
@@ -64,38 +82,12 @@ namespace DataLoader
 	}
 
 	// Namespace Aliases
+	namespace Flags_Arbitrary_Parse = Flags::Arbitrary::Parse;
+	namespace Flags_Arbitrary_Check = Flags::Arbitrary::Check;
 	namespace Flags_Vector_Parse = Flags::Vector::Parse;
 	namespace Flags_Vector_Check = Flags::Vector::Check;
 	namespace Flags_Matrix_Parse = Flags::Matrix::Parse;
 	namespace Flags_Matrix_Check = Flags::Matrix::Check;
-
-	namespace Flags 
-	{
-		// [ReadVector]
-
-		/* Assume that size for vector is not provided */
-		//const unsigned VectorNoSize = 1;
-		/* Read size of vector and validate if the number of given items corresponds */
-		//const unsigned VectorReadSize = (1 << 1);
-		/* Check if all vectors have the same length */
-		//const unsigned CheckVectorsLenEquality = (1 << 2);
-
-		// [ReadMatrix]
-
-		/* Read dimensions (row, col) */
-		//const unsigned ReadDimentions = (1 << 3);
-		/* Read dimentions: each value on separate line {val_1 \n val_2} */
-		//const unsigned ReadDimLineByLine = (1 << 4);
-		/* Read dimentions: each value on the same line {val_1 <delim> val_2 } */
-		//const unsigned ReadDimOneLine = (1 << 5);
-
-		// [ReadArbitrary]
-
-		/* If met delimeter separated values, read one by one */
-		const unsigned ReadSeparately = (1 << 6);
-		/* If met delimeter separated values, read as vector */
-		const unsigned ReadContinuously = (1 << 7);
-	}
 
 	namespace State
 	{
@@ -226,7 +218,7 @@ namespace DataLoader
 			storage.reserve(_storageVector[idx].size());
 			std::copy(_storageVector[idx].begin(), _storageVector[idx].end(), std::back_inserter(storage));
 		};
-
+		
 		// Fill in given array storage
 		void arg_vector(size_t idx, U* storage)
 		{
@@ -240,7 +232,7 @@ namespace DataLoader
 		// Return flattened matrix
 		std::vector<U> arg_matrix()
 		{
-			return _storageMatrix();
+			return _storageMatrix;
 		}
 
 		// Fill in given array storage
@@ -260,7 +252,8 @@ namespace DataLoader
 		}
 		
 		// Parse input file without data specification
-		void read_arbitrary(unsigned opts = Flags::ReadSeparately, Kind type = Kind::Arbitrary)
+		void read_arbitrary(unsigned check_opts = Flags::NullOpts, 
+			unsigned parse_opts = Flags_Arbitrary_Parse::Separately, Kind type = Kind::Arbitrary)
 		{}
 
 		// Parse input file for vector-based data
@@ -290,16 +283,16 @@ namespace DataLoader
 			// we are to read in one vector storage until the end of the file
 			bool readUntilEOF = !checkVecLength && (parse_opts & Flags_Vector_Parse::ItemsLineByLine);
 
-			while (std::getline(fstream, line))
+			while (fstream.good())
 			{
 				std::vector<U> storageItem;
 
 				// Read vector's length
-				if (checkVecLength)
+				if (checkVecLength && std::getline(fstream, line))
 				{
 					sstream.str(line);
 					sstream >> lenNextVector;
-					sstream.clear();					
+					sstream.clear();
 
 					storageItem.reserve(lenNextVector);
 				}
